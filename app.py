@@ -373,4 +373,28 @@ if 'master_results' in st.session_state and not st.session_state['master_results
                 try:
                     s_data = df_out[df_out['Symbol'] == selected_stock].iloc[0]
                     genai.configure(api_key=gemini_api_key)
-                    model = genai.GenerativeMod
+                    model = genai.GenerativeModel('gemini-1.5-flash')
+                    
+                    prompt = f"""
+                    Act as a Senior SEBI Quant Analyst. Execute a strict, institutional forensic audit for {selected_stock}.
+                    
+                    Data Telemetry:
+                    - Price: ₹{s_data['Price (₹)']} (Cap: ₹{s_data['Mkt Cap(Cr)']} Cr)
+                    - Technicals: RSI: {s_data['RSI(14)']}, MACD Hist: {s_data['MACD Hist']}, Volatility(ATR): {s_data['ATR']}, Volume Breakout: {s_data['Vol Breakout']}x
+                    - Fundamentals: P/E: {s_data['P/E']}, P/B: {s_data['P/B']}, ROE: {s_data['ROE %']}%, Debt/Eq: {s_data['Debt/Eq']}
+                    - Ownership: Promoter: {s_data['Promoter %']}%, Insti: {s_data['Insti %']}%
+                    - Trajectory: 3M Ret: {s_data['3M %']}%, 6M Ret: {s_data['6M %']}%
+                    
+                    Generate a structured briefing:
+                    1. **Financial Health & Valuations**: Assess P/E, ROE, Debt, and Shareholding distribution.
+                    2. **Price Action & Technicals**: Interpret the RSI, MACD, and Volume ratio. Are we seeing smart money accumulation or retail distribution?
+                    3. **Wyckoff / Trap Risk**: Identify any red flags or pump-and-dump signals based on the data.
+                    4. **Strategic Execution**: Final verdict (Buy/Hold/Avoid) with strict technical stop-loss logic.
+                    """
+                    
+                    response = model.generate_content(prompt)
+                    st.markdown("### 📋 AI Forensic Intelligence Report")
+                    st.markdown(response.text)
+                except Exception as e:
+                    st.error(f"AI Engine Error: {e}")
+                    
