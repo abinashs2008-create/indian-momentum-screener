@@ -5,3 +5,5 @@ numpy
 requests
 google-generativeai
 plotly
+urllib3
+
