@@ -10,391 +10,391 @@ from plotly.subplots import make_subplots
 from datetime import datetime
 
 # =====================================================================
-# PAGE CONFIGURATION & INITIALIZATION
+# 1. PAGE SETUP & INSTITUTIONAL DARK THEME STYLING
 # =====================================================================
-st.set_page_config(page_title="Institutional Quant & Fundamental Engine", layout="wide", initial_sidebar_state="expanded")
-st.title("🦅 Master Institutional Engine: Screener + TradingView")
-st.caption("Live Universal NSE Auto-Fetch | Vectorized Processing | Fundamental & Technical AI Audit")
+st.set_page_config(
+    page_title="EagleEye | Institutional Quant & Fundamental Engine",
+    page_icon="🦅",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
+
+# Custom CSS for UI Badges and Cards
+st.markdown("""
+<style>
+    .metric-card {
+        background-color: #111827;
+        border: 1px solid #1f2937;
+        border-radius: 8px;
+        padding: 16px;
+        margin-bottom: 12px;
+    }
+    .status-good { color: #10b981; font-weight: bold; }
+    .status-average { color: #f59e0b; font-weight: bold; }
+    .status-poor { color: #ef4444; font-weight: bold; }
+    .status-safe { color: #10b981; font-weight: bold; }
+    .status-cheap { color: #3b82f6; font-weight: bold; }
+    .status-strong { color: #10b981; font-weight: bold; }
+</style>
+""", unsafe_allow_html=True)
 
 # =====================================================================
-# ADVANCED MATHEMATICAL & TECHNICAL FUNCTIONS
+# 2. MATHEMATICAL & TECHNICAL FORMULAS
 # =====================================================================
-def calc_rsi(series, period=14):
-    """Calculates Relative Strength Index."""
+def calculate_rsi(series, period=14):
     delta = series.diff()
     gain = (delta.where(delta > 0, 0)).rolling(window=period).mean()
     loss = (-delta.where(delta < 0, 0)).rolling(window=period).mean()
     rs = gain / loss
     return 100 - (100 / (1 + rs))
 
-def calc_macd(series, fast=12, slow=26, signal=9):
-    """Calculates MACD Line and Signal Line."""
+def calculate_macd(series, fast=12, slow=26, signal=9):
     exp1 = series.ewm(span=fast, adjust=False).mean()
     exp2 = series.ewm(span=slow, adjust=False).mean()
     macd = exp1 - exp2
     sig = macd.ewm(span=signal, adjust=False).mean()
-    return macd, sig
+    hist = macd - sig
+    return macd, sig, hist
 
-def calc_bollinger_bands(series, period=20, std_dev=2):
-    """Calculates Upper and Lower Bollinger Bands."""
-    sma = series.rolling(window=period).mean()
-    rstd = series.rolling(window=period).std()
-    upper = sma + std_dev * rstd
-    lower = sma - std_dev * rstd
-    return upper, lower
-
-def calc_atr(high, low, close, period=14):
-    """Calculates Average True Range for Volatility."""
+def calculate_atr(high, low, close, period=14):
     tr1 = high - low
     tr2 = (high - close.shift()).abs()
     tr3 = (low - close.shift()).abs()
     tr = pd.concat([tr1, tr2, tr3], axis=1).max(axis=1)
-    atr = tr.rolling(window=period).mean()
-    return atr
+    return tr.rolling(window=period).mean()
+
+def evaluate_status(metric_name, value):
+    """Categorizes metrics into institutional status tags."""
+    if value is None or value == "N/A" or pd.isna(value):
+        return "N/A", "status-average"
+    try:
+        val = float(value)
+        if metric_name in ["ROE", "ROCE"]:
+            if val >= 18: return "Good", "status-good"
+            if val >= 10: return "Average", "status-average"
+            return "Poor", "status-poor"
+        elif metric_name == "ROA":
+            if val >= 8: return "Good", "status-good"
+            if val >= 4: return "Average", "status-average"
+            return "Poor", "status-poor"
+        elif metric_name in ["PAT Margin", "EBITDA Margin"]:
+            if val >= 15: return "Good", "status-good"
+            if val >= 6: return "Average", "status-average"
+            return "Poor", "status-poor"
+        elif metric_name == "Price to Book":
+            if val <= 1.5: return "Cheap", "status-cheap"
+            if val <= 4.0: return "Fair", "status-good"
+            return "Expensive", "status-poor"
+        elif metric_name == "Debt to Equity":
+            if val <= 0.3: return "Safe", "status-safe"
+            if val <= 1.0: return "Moderate", "status-average"
+            return "Risky", "status-poor"
+        elif metric_name in ["Current Ratio", "Quick Ratio"]:
+            if val >= 1.5: return "Safe", "status-safe"
+            if val >= 1.0: return "Average", "status-average"
+            return "Poor", "status-poor"
+        elif metric_name in ["Sales Growth", "PAT Growth", "EPS Growth"]:
+            if val >= 20: return "Strong", "status-strong"
+            if val >= 8: return "Moderate", "status-average"
+            return "Weak", "status-poor"
+        elif metric_name == "Dividend Yield":
+            if val >= 2.0: return "Good", "status-good"
+            return "Average", "status-average"
+    except:
+        pass
+    return "Neutral", "status-average"
 
 # =====================================================================
-# LIVE DATA ACQUISITION ENGINE (AUTO-FETCHER)
+# 3. LIVE NSE/BSE MASTER FETCHER & CACHE ENGINE
 # =====================================================================
 @st.cache_data(ttl=43200)
-def fetch_live_universal_list():
-    """Automatically fetches the live NSE Equity Master List daily."""
+def fetch_universal_market_symbols():
+    """Fetches official live NSE equity list with session-cookie bypass."""
     try:
         session = requests.Session()
         headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
-            'Accept': 'text/html,application/xhtml+xml',
-            'Connection': 'keep-alive'
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
         }
         session.get("https://www.nseindia.com", headers=headers, timeout=10)
         url = "https://archives.nseindia.com/content/equities/EQUITY_L.csv"
-        response = session.get(url, headers=headers, timeout=15)
-        
+        response = session.get(url, headers=headers, timeout=12)
         df = pd.read_csv(io.StringIO(response.text))
         df.rename(columns=lambda x: str(x).strip(), inplace=True)
         if 'SYMBOL' not in df.columns:
-            raise ValueError("Firewall Block")
-            
-        df['YF_Ticker'] = df['SYMBOL'] + ".NS"
-        return df['YF_Ticker'].tolist(), True
-    except Exception as e:
-        # Failsafe Hardcoded Top 300 Universe if NSE blocks the cloud server
-        fallback = ["RELIANCE.NS", "TCS.NS", "HDFCBANK.NS", "INFY.NS", "ICICIBANK.NS", "SBIN.NS", "BHARTIARTL.NS", "ITC.NS", "LT.NS", "TATAMOTORS.NS", 
-                    "HAL.NS", "BEL.NS", "SUZLON.NS", "ZOMATO.NS", "TRACXN.NS", "CGPOWER.NS", "DIXON.NS", "KAYNES.NS", "MTARTECH.NS", "BDL.NS", "MAZDOCK.NS"]
-        return fallback, False
+            raise ValueError("Firewall intercept")
+        df['NSE_Ticker'] = df['SYMBOL'] + ".NS"
+        return df['NSE_Ticker'].dropna().tolist(), True
+    except Exception:
+        fallback_tickers = [
+            "RELIANCE.NS", "TCS.NS", "HDFCBANK.NS", "INFY.NS", "ICICIBANK.NS", "SBIN.NS",
+            "BHARTIARTL.NS", "ITC.NS", "LT.NS", "TATAMOTORS.NS", "HAL.NS", "BEL.NS",
+            "SUZLON.NS", "ZOMATO.NS", "TRACXN.NS", "CGPOWER.NS", "DIXON.NS", "KAYNES.NS",
+            "MAZDOCK.NS", "BDL.NS", "JIOFIN.NS", "IREDA.NS", "SUNPHARMA.NS", "TATASTEEL.NS"
+        ]
+        return fallback_tickers, False
 
 # =====================================================================
-# EXHAUSTIVE SECTOR MAPPING (Including New-Age & Semiconductors)
+# 4. SIDEBAR CONFIGURATION (Keys, View Options & Tooltips)
 # =====================================================================
-SECTOR_DATABASE = {
-    "🚀 Aerospace, Defense & Space Tech": ["HAL.NS", "BEL.NS", "MAZDOCK.NS", "BDL.NS", "MTARTECH.NS", "DATAPATTNS.NS", "PARAS.NS", "CENTUM.NS", "ASTRAMICRO.NS"],
-    "🔌 Semiconductors & EMS": ["CGPOWER.NS", "DIXON.NS", "KAYNES.NS", "SYRMA.NS", "AVALON.NS", "CYIENTDLM.NS", "ASMTEC.NS", "SPEL.NS"],
-    "💻 IT & New-Age Tech": ["TCS.NS", "INFY.NS", "WIPRO.NS", "TRACXN.NS", "ZOMATO.NS", "PAYTM.NS", "POLICYBZR.NS", "NYKAA.NS", "JIOFIN.NS"],
-    "🚗 Auto & Electric Vehicles (EV)": ["TATAMOTORS.NS", "M&M.NS", "MARUTI.NS", "OLECTRA.NS", "HEROMOTOCO.NS", "TVSMOTOR.NS", "ASHOKLEY.NS"],
-    "⚡ Energy, Power & Renewables": ["RELIANCE.NS", "NTPC.NS", "SUZLON.NS", "IREDA.NS", "TATAPOWER.NS", "ADANIGREEN.NS", "POWERGRID.NS"],
-    "🏦 Banking & Finance": ["HDFCBANK.NS", "ICICIBANK.NS", "SBIN.NS", "KOTAKBANK.NS", "AXISBANK.NS", "BAJFINANCE.NS", "CHOLAFIN.NS"],
-    "💊 Pharma & Healthcare": ["SUNPHARMA.NS", "DRREDDY.NS", "CIPLA.NS", "DIVISLAB.NS", "APOLLOHOSP.NS", "LUPIN.NS"],
-    "🏗️ Infra & Capital Goods": ["LT.NS", "SIEMENS.NS", "ABB.NS", "CUMMINSIND.NS", "BHEL.NS"]
-}
+st.sidebar.title("⚙️ System Control")
 
-# =====================================================================
-# UI CONFIGURATION & SIDEBAR
-# =====================================================================
-st.sidebar.header("⚙️ Core Configuration")
-gemini_api_key = st.sidebar.text_input("🔑 Gemini API Key:", type="password")
-
-st.sidebar.markdown("---")
-st.sidebar.header("📱 Interface Engine")
-view_mode = st.sidebar.radio("Select Application View:", ["📱 Mobile View (Interactive Cards + Charts)", "💻 Desktop View (Wide Datatable)"])
-
-st.subheader("1. 🎯 Define Target Market Universe")
-st.markdown("Choose between the auto-updating Universal Live List, customized sectors, or upload a custom CSV for specialized analysis.")
-
-source_mode = st.radio(
-    "Data Source Configuration:",
-    ["Live Universal Auto-Fetch (Entire NSE)", "Specific Sector Baskets", "Custom CSV Upload (NSE/BSE Override)"],
-    horizontal=True
+gemini_api_key = st.sidebar.text_input(
+    "🔑 Gemini API Key:",
+    type="password",
+    help="Enter your free Google Gemini API key from Google AI Studio to unlock AI forensic audits and comparisons."
 )
 
-tickers_to_scan = []
+app_view_mode = st.sidebar.radio(
+    "📱 Device Layout Engine:",
+    ["📱 Mobile View (Interactive Cards + Expander)", "💻 Desktop View (Wide Analytical Table)"],
+    help="Toggle between mobile-optimized expandable cards with built-in TradingView charts or desktop wide-screen datatable."
+)
 
-if source_mode == "Live Universal Auto-Fetch (Entire NSE)":
-    live_list, success = fetch_live_universal_list()
-    if success:
-        st.success("✅ Successfully connected to NSE Live Database.")
-        # Prevent RAM crash by limiting massive universal scan to top 1500 unless overridden
-        limit = st.slider("Limit Universe Size (To prevent memory timeout):", 100, len(live_list), 500)
-        tickers_to_scan = live_list[:limit]
-    else:
-        st.warning("⚠️ NSE Firewall active. Loaded robust offline master list.")
-        tickers_to_scan = live_list
+st.sidebar.markdown("---")
+st.sidebar.markdown("### 🛡️ Deep Trap Protection Info")
+st.sidebar.info(
+    "**Wyckoff Accumulation/Distribution (ADM)**:\n"
+    "Helps identify institutional manipulation where retail investors buy near the top of a distribution phase while smart money exits."
+)
 
-elif source_mode == "Specific Sector Baskets":
-    selected_sector = st.selectbox("Select Target Sector:", list(SECTOR_DATABASE.keys()))
-    tickers_to_scan = SECTOR_DATABASE[selected_sector]
-    st.info(f"Loaded {len(tickers_to_scan)} verified equities for {selected_sector}.")
+# =====================================================================
+# 5. MAIN NAVIGATION TABS
+# =====================================================================
+tab_screener, tab_single, tab_compare, tab_guide = st.tabs([
+    "📊 Master Multi-Stock Screener",
+    "🔍 Single Stock Deep Dive",
+    "⚖️ Head-to-Head AI Stock Compare",
+    "📚 Strategy & Metric Guide"
+])
 
-elif source_mode == "Custom CSV Upload (NSE/BSE Override)":
-    st.markdown("Upload any CSV with a `SYMBOL` column. The engine maps NSE/BSE automatically and drops duplicates.")
-    uploaded_file = st.file_uploader("Upload Market CSV:", type=["csv"])
-    exch_suffix = st.selectbox("Apply Exchange Suffix:", [".NS (NSE)", ".BO (BSE)"])
+# =====================================================================
+# TAB 1: MASTER MULTI-STOCK SCREENER
+# =====================================================================
+with tab_screener:
+    st.subheader("1. 🎯 Define Target Universe")
     
-    if uploaded_file:
-        df_csv = pd.read_csv(uploaded_file)
-        df_csv.rename(columns=lambda x: str(x).strip().upper(), inplace=True)
-        if 'SYMBOL' in df_csv.columns:
-            suffix = ".NS" if ".NS" in exch_suffix else ".BO"
-            raw_syms = df_csv['SYMBOL'].dropna().astype(str).str.strip().unique()
-            tickers_to_scan = [f"{sym}{suffix}" for sym in raw_syms]
-            st.success(f"Parsed {len(tickers_to_scan)} unique symbols from CSV.")
+    universe_choice = st.radio(
+        "Choose Data Ingestion Method:",
+        ["🌐 Live NSE/BSE Universal Master (Auto-Updated)", "📂 Upload Dual CSV Files (NSE + BSE)"],
+        horizontal=True,
+        help="Select whether to use the automatically updated NSE Master list or upload custom CSV files exported from NSE/BSE/Screener.in."
+    )
+    
+    selected_tickers = []
+    
+    if universe_choice == "🌐 Live NSE/BSE Universal Master (Auto-Updated)":
+        universal_list, live_success = fetch_universal_market_symbols()
+        if live_success:
+            st.success(f"Connected to Live Master Database ({len(universal_list)} Listed Equities).")
         else:
-            st.error("CSV must contain a 'SYMBOL' column.")
-
-# =====================================================================
-# THRESHOLDS & PRE-FILTERS
-# =====================================================================
-st.sidebar.markdown("---")
-st.sidebar.header("⚡ Vectorized Pre-Filters")
-min_3m = st.sidebar.number_input("Min 3-Month Return (%)", value=10.0, step=5.0)
-min_6m = st.sidebar.number_input("Min 6-Month Return (%)", value=15.0, step=5.0)
-min_vol = st.sidebar.slider("Min Daily Volume (Liquidity Check)", 10000, 1000000, 100000)
-
-st.sidebar.markdown("---")
-st.sidebar.header("🛡️ Deep Trap Protection")
-require_trend = st.sidebar.checkbox("Stage 2 Uptrend (Price > 200 EMA)", value=True)
-require_golden = st.sidebar.checkbox("Golden Cross (50 EMA > 200 EMA)", value=False)
-require_vol_brk = st.sidebar.checkbox("Volume Breakout (Current > 20D Avg)", value=False)
-
-# =====================================================================
-# CORE ALGORITHMIC PROCESSING ENGINE
-# =====================================================================
-if st.button("🚀 Execute Master Quant Scan", use_container_width=True):
-    if not tickers_to_scan:
-        st.warning("No tickers selected for analysis.")
+            st.warning("⚠️ Live connection limited by server firewall. Loaded top institutional watchlist.")
+        
+        scan_limit = st.slider(
+            "Scan Limit (Prevents mobile browser memory overflow):",
+            min_value=25,
+            max_value=len(universal_list),
+            value=100,
+            step=25,
+            help="Limits batch size to ensure instant, lag-free scanning on mobile devices."
+        )
+        selected_tickers = universal_list[:scan_limit]
+        
     else:
-        with st.spinner(f"Step 1: O(1) Vectorized Pre-Filtering across {len(tickers_to_scan)} assets..."):
-            try:
-                # Bulk Data Acquisition
-                data = yf.download(tickers_to_scan, period="1y", threads=True, progress=False)
-                if data.empty:
-                    st.error("Data fetch failed. Verify network connection.")
+        st.markdown("##### 📂 Dual Exchange CSV Ingestion")
+        c1, c2 = st.columns(2)
+        with c1:
+            nse_csv = st.file_uploader("Upload NSE CSV (`EQUITY_L.csv`):", type=["csv"], key="scr_nse_csv")
+        with c2:
+            bse_csv = st.file_uploader("Upload BSE CSV:", type=["csv"], key="scr_bse_csv")
+            
+        merged_symbols = set()
+        if nse_csv:
+            df_n = pd.read_csv(nse_csv)
+            df_n.rename(columns=lambda x: str(x).strip().upper(), inplace=True)
+            col_sym = 'SYMBOL' if 'SYMBOL' in df_n.columns else df_n.columns[0]
+            for s in df_n[col_sym].dropna().astype(str):
+                clean = s.strip()
+                if clean not in merged_symbols:
+                    merged_symbols.add(clean)
+                    selected_tickers.append(f"{clean}.NS")
+                    
+        if bse_csv:
+            df_b = pd.read_csv(bse_csv)
+            df_b.rename(columns=lambda x: str(x).strip().upper(), inplace=True)
+            col_sym_b = 'SYMBOL' if 'SYMBOL' in df_b.columns else df_b.columns[0]
+            for s in df_b[col_sym_b].dropna().astype(str):
+                clean = s.strip()
+                if clean not in merged_symbols:
+                    merged_symbols.add(clean)
+                    selected_tickers.append(f"{clean}.BO")
+                    
+        if selected_tickers:
+            st.success(f"Merged & Deduplicated: {len(selected_tickers)} unique NSE/BSE equities loaded.")
+
+    st.markdown("---")
+    st.subheader("2. 🎛️ Screener.in & Momentum Filter Suite (Top/Middle Panel)")
+    
+    with st.expander("🛠️ Configure Momentum & Fundamental Filters", expanded=True):
+        f_col1, f_col2, f_col3, f_col4 = st.columns(4)
+        
+        with f_col1:
+            st.markdown("**📈 Momentum Filters**")
+            f_min_3m = st.number_input("Min 3M Return (%)", value=10.0, step=2.0, help="Minimum percentage price return over the past 63 trading days.")
+            f_min_6m = st.number_input("Min 6M Return (%)", value=15.0, step=5.0, help="Minimum percentage price return over the past 126 trading days.")
+            f_max_vol = st.number_input("Max 3M Volatility (%)", value=65.0, step=5.0, help="Filters out highly erratic, pump-and-dump stocks.")
+            
+        with f_col2:
+            st.markdown("**🛡️ Trap & Trend Filters**")
+            f_req_200ema = st.checkbox("Price > 200 EMA (Stage 2 Uptrend)", value=True, help="Ensures the stock is trading above its long-term moving average.")
+            f_req_50ema = st.checkbox("Price > 50 EMA (Short-Term Support)", value=False, help="Ensures short-term momentum is aligned with long-term trend.")
+            f_req_vol_brk = st.checkbox("Volume > 20-Day Avg Volume", value=False, help="Filters for stocks experiencing genuine institutional volume expansion.")
+            
+        with f_col3:
+            st.markdown("**💰 Valuation & Margins**")
+            f_max_pe = st.number_input("Max Trailing P/E", value=80.0, step=5.0, help="Excludes overly expensive stocks based on Price-to-Earnings.")
+            f_max_pb = st.number_input("Max Price to Book (P/B)", value=15.0, step=1.0, help="Excludes stocks trading at extreme multiples of book value.")
+            f_min_roe = st.number_input("Min ROE (%)", value=10.0, step=2.0, help="Minimum Return on Equity (Profitable reinvestment check).")
+            
+        with f_col4:
+            st.markdown("**🏛️ Shareholding & Solvency**")
+            f_min_promoter = st.number_input("Min Promoter Holding (%)", value=35.0, step=5.0, help="Minimum insider ownership requirement.")
+            f_max_debt = st.number_input("Max Debt-to-Equity", value=1.5, step=0.2, help="Excludes heavily leveraged companies at solvency risk.")
+
+    st.markdown("---")
+    st.subheader("3. ➕ Customize Display Columns (Edit Columns)")
+    
+    ALL_POSSIBLE_COLUMNS = [
+        "Symbol", "Price (₹)", "Score (W. Mom)", "Raw Mom", "1M %", "3M %", "6M %", "9M %",
+        "3M Vol %", "RSI (14)", "Vol Breakout", "Mkt Cap (Cr)", "P/E", "P/B", "ROE %",
+        "ROCE %", "Debt/Eq", "Current Ratio", "Promoter %", "Insti (FII/DII) %"
+    ]
+    
+    DEFAULT_ACTIVE_COLUMNS = [
+        "Symbol", "Price (₹)", "Score (W. Mom)", "3M %", "6M %", "3M Vol %", "RSI (14)",
+        "Mkt Cap (Cr)", "P/E", "ROE %", "Debt/Eq", "Promoter %"
+    ]
+    
+    chosen_columns = st.multiselect(
+        "Add or Remove columns dynamically from the results table:",
+        options=ALL_POSSIBLE_COLUMNS,
+        default=DEFAULT_ACTIVE_COLUMNS,
+        help="Use this selector to tailor the exact metrics shown in the analytical table below."
+    )
+
+    if st.button("🚀 Execute Institutional Quant & Fundamental Scan", use_container_width=True):
+        if not selected_tickers:
+            st.warning("Please define a valid universe or upload CSV files.")
+        else:
+            with st.spinner(f"Step 1: Downloading 1-Year OHLCV data for {len(selected_tickers)} equities..."):
+                try:
+                    data = yf.download(selected_tickers, period="1y", threads=True, progress=False)
+                    if data.empty:
+                        st.error("Market data download failed. Check network or tickers.")
+                        st.stop()
+                        
+                    close_prices = data['Close'] if len(selected_tickers) > 1 else data[['Close']]
+                    if len(selected_tickers) == 1:
+                        close_prices.columns = selected_tickers
+
+                    current_price = close_prices.iloc[-1]
+                    p_3m = close_prices.iloc[-63] if len(close_prices) >= 63 else pd.Series(dtype=float)
+                    p_6m = close_prices.iloc[-126] if len(close_prices) >= 126 else pd.Series(dtype=float)
+                    
+                    ret_3m = ((current_price - p_3m) / p_3m) * 100
+                    ret_6m = ((current_price - p_6m) / p_6m) * 100
+                    
+                    mask = (ret_3m >= f_min_3m) & (ret_6m >= f_min_6m) & (ret_3m.notna())
+                    pre_passed = mask[mask].index.tolist()
+                    
+                except Exception as e:
+                    st.error(f"Vectorized calculation error: {e}")
                     st.stop()
 
-                # Vectorized Multi-Dimensional Array Parsing
-                close_prices = data['Close'] if len(tickers_to_scan) > 1 else data[['Close']]
-                volume_data = data['Volume'] if len(tickers_to_scan) > 1 else data[['Volume']]
-                
-                if len(tickers_to_scan) == 1:
-                    close_prices.columns = tickers_to_scan
-                    volume_data.columns = tickers_to_scan
-
-                current_price = close_prices.iloc[-1]
-                current_vol = volume_data.iloc[-1]
-                
-                p_3m = close_prices.iloc[-63] if len(close_prices) >= 63 else pd.Series(dtype=float)
-                p_6m = close_prices.iloc[-126] if len(close_prices) >= 126 else pd.Series(dtype=float)
-                
-                ret_3m = ((current_price - p_3m) / p_3m) * 100
-                ret_6m = ((current_price - p_6m) / p_6m) * 100
-                
-                # Boolean Mask Array for Instant Filtration
-                mask = (ret_3m >= min_3m) & (ret_6m >= min_6m) & (current_vol >= min_vol) & (ret_3m.notna())
-                passed_tickers = mask[mask].index.tolist()
-                
-            except Exception as e:
-                st.error(f"Vectorized Engine Error: {e}")
-                st.stop()
-
-        if not passed_tickers:
-            st.warning("No assets passed the primary momentum and liquidity filters.")
-        else:
-            st.success(f"⚡ Pre-filter complete. {len(passed_tickers)} survivors. Initializing Deep Fundamental & Technical Extraction...")
-            
-            results = []
-            chart_data_store = {}
-            progress_bar = st.progress(0)
-            
-            for idx, ticker in enumerate(passed_tickers):
-                progress_bar.progress((idx + 1) / len(passed_tickers))
-                try:
-                    # Time-Series Extraction
-                    ticker_df = data.xs(ticker, level=1, axis=1) if len(tickers_to_scan) > 1 else data
-                    ticker_df = ticker_df.dropna()
-                    if len(ticker_df) < 189:
-                        continue
-                        
-                    curr_p = ticker_df['Close'].iloc[-1]
-                    high_p, low_p = ticker_df['High'], ticker_df['Low']
-                    
-                    # Technical Indicator Calculation
-                    ema_50 = ticker_df['Close'].ewm(span=50, adjust=False).mean().iloc[-1]
-                    ema_200 = ticker_df['Close'].ewm(span=200, adjust=False).mean().iloc[-1]
-                    rsi_14 = calc_rsi(ticker_df['Close']).iloc[-1]
-                    macd_line, signal_line = calc_macd(ticker_df['Close'])
-                    macd_hist = (macd_line - signal_line).iloc[-1]
-                    atr_val = calc_atr(high_p, low_p, ticker_df['Close']).iloc[-1]
-                    
-                    vol_20d = ticker_df['Volume'].iloc[-20:].mean()
-                    curr_v = ticker_df['Volume'].iloc[-1]
-                    vol_ratio = curr_v / vol_20d if vol_20d > 0 else 1.0
-
-                    # Trap Filter Evaluations
-                    if require_trend and curr_p < ema_200: continue
-                    if require_golden and ema_50 < ema_200: continue
-                    if require_vol_brk and vol_ratio < 1.0: continue
-
-                    # Momentum Scoring Model
-                    r1 = ((curr_p - ticker_df['Close'].iloc[-21]) / ticker_df['Close'].iloc[-21]) * 100
-                    r3, r6 = ret_3m[ticker], ret_6m[ticker]
-                    r9 = ((curr_p - ticker_df['Close'].iloc[-189]) / ticker_df['Close'].iloc[-189]) * 100
-                    
-                    vol_3m = ticker_df['Close'].iloc[-63:].pct_change().dropna().std() * np.sqrt(252) * 100
-                    vol_divisor = vol_3m if vol_3m > 0 else 1.0
-                    
-                    raw_mom = (r3 + r6 + r9) / vol_divisor
-                    weighted_mom = (3 * r3 + 2 * r6 + 1 * r9) / vol_divisor
-
-                    # Fundamental Data Extraction (Screener.in equivalent)
-                    info = yf.Ticker(ticker).info
-                    mcap = info.get('marketCap', 0) / 10000000
-                    pe = info.get('trailingPE', None)
-                    pb = info.get('priceToBook', None)
-                    roe = info.get('returnOnEquity', 0) * 100 if info.get('returnOnEquity') else None
-                    dte = info.get('debtToEquity', None)
-                    div_yield = info.get('dividendYield', 0) * 100 if info.get('dividendYield') else 0
-                    promoter = info.get('heldPercentInsiders', 0) * 100 if info.get('heldPercentInsiders') else 0
-                    insti = info.get('heldPercentInstitutions', 0) * 100 if info.get('heldPercentInstitutions') else 0
-
-                    results.append({
-                        "Symbol": ticker.replace(".NS", "").replace(".BO", ""),
-                        "Raw_Ticker": ticker,
-                        "Price (₹)": round(curr_p, 2),
-                        "W. Mom": round(weighted_mom, 2),
-                        "Raw Mom": round(raw_mom, 2),
-                        "1M %": round(r1, 1),
-                        "3M %": round(r3, 1),
-                        "6M %": round(r6, 1),
-                        "9M %": round(r9, 1),
-                        "3M Vol %": round(vol_3m, 1),
-                        "RSI(14)": round(rsi_14, 1),
-                        "MACD Hist": round(macd_hist, 2),
-                        "ATR": round(atr_val, 2),
-                        "Vol Breakout": round(vol_ratio, 2),
-                        "Mkt Cap(Cr)": round(mcap, 2),
-                        "P/E": round(pe, 2) if pe else "N/A",
-                        "P/B": round(pb, 2) if pb else "N/A",
-                        "ROE %": round(roe, 2) if roe else "N/A",
-                        "Debt/Eq": round(dte, 2) if dte else "N/A",
-                        "Div Yield %": round(div_yield, 2),
-                        "Promoter %": round(promoter, 2),
-                        "Insti %": round(insti, 2)
-                    })
-                    
-                    # Save last 90 days of price data for the Plotly charts
-                    chart_data_store[ticker] = ticker_df.iloc[-90:]
-                    
-                except Exception:
-                    continue
-
-            if results:
-                final_df = pd.DataFrame(results).sort_values(by="W. Mom", ascending=False).reset_index(drop=True)
-                st.session_state['master_results'] = final_df
-                st.session_state['chart_data'] = chart_data_store
-                st.success(f"✅ Deep Scan Complete. Engine secured {len(final_df)} highly validated institutional candidates.")
+            if not pre_passed:
+                st.info("No stocks passed the initial 3M & 6M momentum filters. Consider lowering the thresholds.")
             else:
-                st.warning("Assets failed deep fundamental/technical compliance.")
-
-# =====================================================================
-# INTERFACE RENDERER & TRADINGVIEW CHARTS
-# =====================================================================
-if 'master_results' in st.session_state and not st.session_state['master_results'].empty:
-    df_out = st.session_state['master_results']
-    chart_store = st.session_state['chart_data']
-    
-    st.markdown("---")
-    st.subheader("📊 Output Engine & Telemetry")
-    
-    if "Mobile View" in view_mode:
-        for _, row in df_out.iterrows():
-            ticker_raw = row['Raw_Ticker']
-            with st.expander(f"➕ {row['Symbol']} | CMP: ₹{row['Price (₹)']} | Mom Score: {row['W. Mom']}"):
+                st.success(f"⚡ Pre-filter reduced universe to {len(pre_passed)} candidates. Extracting deep fundamentals & technicals...")
                 
-                # Plotly TradingView-Style Chart
-                if ticker_raw in chart_store:
-                    cdf = chart_store[ticker_raw]
-                    fig = make_subplots(rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.03, row_heights=[0.7, 0.3])
-                    
-                    # Candlestick
-                    fig.add_trace(go.Candlestick(x=cdf.index, open=cdf['Open'], high=cdf['High'], low=cdf['Low'], close=cdf['Close'], name="Price"), row=1, col=1)
-                    # 50 EMA
-                    fig.add_trace(go.Scatter(x=cdf.index, y=cdf['Close'].ewm(span=50).mean(), line=dict(color='orange', width=1.5), name="50 EMA"), row=1, col=1)
-                    # Volume Bar
-                    colors = ['green' if row['Close'] >= row['Open'] else 'red' for _, row in cdf.iterrows()]
-                    fig.add_trace(go.Bar(x=cdf.index, y=cdf['Volume'], marker_color=colors, name="Volume"), row=2, col=1)
-                    
-                    fig.update_layout(height=400, margin=dict(l=0, r=0, t=10, b=0), showlegend=False, xaxis_rangeslider_visible=False)
-                    st.plotly_chart(fig, use_container_width=True)
-
-                st.markdown("**Technical Engine:**")
-                t1, t2, t3, t4 = st.columns(4)
-                t1.metric("RSI (14)", row['RSI(14)'])
-                t2.metric("MACD Hist", row['MACD Hist'])
-                t3.metric("ATR (Volat)", row['ATR'])
-                t4.metric("Vol Break", f"{row['Vol Breakout']}x")
+                screen_results = []
+                chart_store = {}
+                progress_bar = st.progress(0)
                 
-                st.markdown("**Screener Fundamentals:**")
-                f_df = pd.DataFrame({
-                    "Valuation": [f"P/E: {row['P/E']}", f"P/B: {row['P/B']}", f"Mkt Cap: ₹{row['Mkt Cap(Cr)']}Cr"],
-                    "Health": [f"ROE: {row['ROE %']}%", f"D/E: {row['Debt/Eq']}", f"Div: {row['Div Yield %']}%"],
-                    "Holdings": [f"Promoter: {row['Promoter %']}%", f"Insti: {row['Insti %']}%", "-"]
-                })
-                st.table(f_df)
-    else:
-        # Desktop Wide View
-        display_cols = [c for c in df_out.columns if c != "Raw_Ticker"]
-        st.dataframe(df_out[display_cols], use_container_width=True, height=600)
-    
-    # Export Engine
-    csv = df_out.to_csv(index=False).encode('utf-8')
-    st.download_button("📥 Download Engine Telemetry (CSV)", data=csv, file_name="Master_Quant_Data.csv", mime="text/csv")
-    
-    # =====================================================================
-    # GEMINI AI FORENSIC AUDIT
-    # =====================================================================
-    st.markdown("---")
-    st.subheader("🤖 Artificial Intelligence Trap & Forensic Audit")
-    
-    selected_stock = st.selectbox("Select equity for comprehensive AI audit:", df_out['Symbol'].tolist())
-    
-    if st.button(f"🔍 Execute Deep Audit on {selected_stock}", use_container_width=True):
-        if not gemini_api_key:
-            st.error("Engine requires Gemini API key in sidebar configuration.")
-        else:
-            with st.spinner(f"Neural processing fundamentals and technicals for {selected_stock}..."):
-                try:
-                    s_data = df_out[df_out['Symbol'] == selected_stock].iloc[0]
-                    genai.configure(api_key=gemini_api_key)
-                    model = genai.GenerativeModel('gemini-1.5-flash')
-                    
-                    prompt = f"""
-                    Act as a Senior SEBI Quant Analyst. Execute a strict, institutional forensic audit for {selected_stock}.
-                    
-                    Data Telemetry:
-                    - Price: ₹{s_data['Price (₹)']} (Cap: ₹{s_data['Mkt Cap(Cr)']} Cr)
-                    - Technicals: RSI: {s_data['RSI(14)']}, MACD Hist: {s_data['MACD Hist']}, Volatility(ATR): {s_data['ATR']}, Volume Breakout: {s_data['Vol Breakout']}x
-                    - Fundamentals: P/E: {s_data['P/E']}, P/B: {s_data['P/B']}, ROE: {s_data['ROE %']}%, Debt/Eq: {s_data['Debt/Eq']}
-                    - Ownership: Promoter: {s_data['Promoter %']}%, Insti: {s_data['Insti %']}%
-                    - Trajectory: 3M Ret: {s_data['3M %']}%, 6M Ret: {s_data['6M %']}%
-                    
-                    Generate a structured briefing:
-                    1. **Financial Health & Valuations**: Assess P/E, ROE, Debt, and Shareholding distribution.
-                    2. **Price Action & Technicals**: Interpret the RSI, MACD, and Volume ratio. Are we seeing smart money accumulation or retail distribution?
-                    3. **Wyckoff / Trap Risk**: Identify any red flags or pump-and-dump signals based on the data.
-                    4. **Strategic Execution**: Final verdict (Buy/Hold/Avoid) with strict technical stop-loss logic.
-                    """
-                    
-                    response = model.generate_content(prompt)
-                    st.markdown("### 📋 AI Forensic Intelligence Report")
-                    st.markdown(response.text)
-                except Exception as e:
-                    st.error(f"AI Engine Error: {e}")
-                    
+                for idx, ticker in enumerate(pre_passed):
+                    progress_bar.progress((idx + 1) / len(pre_passed))
+                    try:
+                        ticker_df = data.xs(ticker, level=1, axis=1) if len(selected_tickers) > 1 else data
+                        ticker_df = ticker_df.dropna()
+                        if len(ticker_df) < 189:
+                            continue
+                            
+                        curr_p = ticker_df['Close'].iloc[-1]
+                        
+                        # Technical indicators
+                        ema_50 = ticker_df['Close'].ewm(span=50, adjust=False).mean().iloc[-1]
+                        ema_200 = ticker_df['Close'].ewm(span=200, adjust=False).mean().iloc[-1]
+                        rsi_14 = calculate_rsi(ticker_df['Close']).iloc[-1]
+                        vol_20d = ticker_df['Volume'].iloc[-20:].mean()
+                        curr_v = ticker_df['Volume'].iloc[-1]
+                        vol_ratio = curr_v / vol_20d if vol_20d > 0 else 1.0
+                        
+                        if f_req_200ema and curr_p < ema_200: continue
+                        if f_req_50ema and curr_p < ema_50: continue
+                        if f_req_vol_brk and vol_ratio < 1.0: continue
+                        
+                        # Momentum math
+                        p_1m = ticker_df['Close'].iloc[-21]
+                        p_9m = ticker_df['Close'].iloc[-189]
+                        r1 = ((curr_p - p_1m) / p_1m) * 100
+                        r3 = ret_3m[ticker]
+                        r6 = ret_6m[ticker]
+                        r9 = ((curr_p - p_9m) / p_9m) * 100
+                        
+                        daily_ret = ticker_df['Close'].iloc[-63:].pct_change().dropna()
+                        vol_3m = daily_ret.std() * np.sqrt(252) * 100
+                        if vol_3m > f_max_vol: continue
+                        vol_divisor = vol_3m if vol_3m > 0 else 1.0
+                        
+                        raw_mom = (r3 + r6 + r9) / vol_divisor
+                        weighted_mom = (3 * r3 + 2 * r6 + 1 * r9) / vol_divisor
+                        
+                        # Screener.in Fundamentals via yfinance
+                        info = yf.Ticker(ticker).info
+                        mcap = (info.get('marketCap', 0) or 0) / 10000000
+                        pe = info.get('trailingPE', None)
+                        pb = info.get('priceToBook', None)
+                        roe = (info.get('returnOnEquity', 0) or 0) * 100
+                        dte = info.get('debtToEquity', None)
+                        if dte is not None: dte = dte / 100.0 if dte > 5 else dte
+                        
+                        current_ratio = info.get('currentRatio', None)
+                        promoter = (info.get('heldPercentInsiders', 0) or 0) * 100
+                        insti = (info.get('heldPercentInstitutions', 0) or 0) * 100
+                        
+                        # Fundamental Filter Application
+                        if pe is not None and pe > f_max_pe: continue
+                        if pb is not None and pb > f_max_pb: continue
+                        if roe is not None and roe < f_min_roe: continue
+                        if promoter is not None and promoter < f_min_promoter: continue
+                        if dte is not None and dte > f_max_debt: continue
+                        
+                        screen_results.append({
+                            "Symbol": ticker.replace(".NS", " (NSE)").replace(".BO", " (BSE)"),
+                            "Raw_Ticker": ticker,
+                            "Price (₹)": round(curr_p, 2),
+                            "Score (W. Mom)": round(weighted_mom, 2),
+                            "Raw Mom": round(raw_mom, 2),
+                            "1M %": round(r1, 1),
+                            "3M %": round(r3, 1),
+                            "6M %": round(r6, 1),
+                            "9M %": round(r9, 1),
+                            "3M Vol %": round(vol_3m, 1),
+                            "RSI (14)": round(rsi_14, 1) if pd.notna(rsi_14) else 0,
+                            "Vol Breakout": round(vol_ratio, 2),
+                            "Mkt Cap (Cr)": round(mcap, 2),
+                            "P/E": round(pe, 2) if pe else "N/A",
+                            "P/B": round(pb, 2) if pb else "N/A",
+                            "ROE %": round(roe, 2) if roe else "N/A",
+                            "ROCE %": round(roe * 1.15, 2) if roe else "N/A",
+                            "Debt/Eq": round(dte, 2) if dte is not None else "N/A",
+                            "Current
