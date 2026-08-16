@@ -682,4 +682,73 @@ with tab_compare:
                         ],
                         f"{stock_a}": [
                             f"₹{cp_a:,.2f}", f"₹{(i_a.get('marketCap', 0) or 0)/1e7:,.2f} Cr", f"{r3_a:+.2f}%", f"{r6_a:+.2f}%",
-                            f"{vol_a:.2f}%", f"{w_a:.2f}", 
+                            f"{vol_a:.2f}%", f"{w_a:.2f}", f"{i_a.get('trailingPE', 'N/A')}", f"{i_a.get('priceToBook', 'N/A')}",
+                            f"{(i_a.get('returnOnEquity', 0) or 0)*100:.2f}%", f"{i_a.get('debtToEquity', 'N/A')}", f"{i_a.get('currentRatio', 'N/A')}",
+                            f"{(i_a.get('heldPercentInsiders', 0) or 0)*100:.2f}%", f"{(i_a.get('heldPercentInstitutions', 0) or 0)*100:.2f}%"
+                        ],
+                        f"{stock_b}": [
+                            f"₹{cp_b:,.2f}", f"₹{(i_b.get('marketCap', 0) or 0)/1e7:,.2f} Cr", f"{r3_b:+.2f}%", f"{r6_b:+.2f}%",
+                            f"{vol_b:.2f}%", f"{w_b:.2f}", f"{i_b.get('trailingPE', 'N/A')}", f"{i_b.get('priceToBook', 'N/A')}",
+                            f"{(i_b.get('returnOnEquity', 0) or 0)*100:.2f}%", f"{i_b.get('debtToEquity', 'N/A')}", f"{i_b.get('currentRatio', 'N/A')}",
+                            f"{(i_b.get('heldPercentInsiders', 0) or 0)*100:.2f}%", f"{(i_b.get('heldPercentInstitutions', 0) or 0)*100:.2f}%"
+                        ]
+                    })
+                    
+                    st.markdown("### 📊 Side-by-Side Financial & Technical Metric Comparison")
+                    st.table(cmp_table)
+                    
+                    if gemini_api_key:
+                        st.markdown("---")
+                        st.markdown("### 🤖 Institutional Comparative Verdict")
+                        with st.spinner("AI evaluating institutional accumulation, earnings quality, and selecting the superior opportunity..."):
+                            genai.configure(api_key=gemini_api_key)
+                            model = genai.GenerativeModel('gemini-1.5-flash')
+                            
+                            comp_prompt = f"""
+                            Act as an Institutional Fund Manager and Senior SEBI Analyst.
+                            Compare two Indian equities head-to-head:
+                            
+                            Stock A ({stock_a}): Price: ₹{cp_a}, 3M Ret: {r3_a:.2f}%, 6M Ret: {r6_a:.2f}%, Vol: {vol_a:.2f}%, PE: {i_a.get('trailingPE')}, PB: {i_a.get('priceToBook')}, ROE: {(i_a.get('returnOnEquity', 0) or 0)*100:.2f}%, D/E: {i_a.get('debtToEquity')}
+                            Stock B ({stock_b}): Price: ₹{cp_b}, 3M Ret: {r3_b:.2f}%, 6M Ret: {r6_b:.2f}%, Vol: {vol_b:.2f}%, PE: {i_b.get('trailingPE')}, PB: {i_b.get('priceToBook')}, ROE: {(i_b.get('returnOnEquity', 0) or 0)*100:.2f}%, D/E: {i_b.get('debtToEquity')}
+                            
+                            Provide a structured analysis:
+                            1. **Executive Comparison**: Which stock shows higher capital efficiency and earnings quality?
+                            2. **Valuation & Margin of Safety**: Which stock is fairly valued vs overextended?
+                            3. **Momentum & Trap Risk**: Is either stock showing signs of retail distribution (Wyckoff ADM)?
+                            4. **Final Recommendation**: Provide a clear recommendation on which stock to buy for a multi-month positional timeframe, including specific stop-loss logic.
+                            """
+                            comp_res = model.generate_content(comp_prompt)
+                            st.markdown(comp_res.text)
+                    else:
+                        st.info("💡 Enter your Gemini API key in the left sidebar to generate the automated AI comparative report.")
+            except Exception as e:
+                st.error(f"Comparison error: {e}")
+
+# =====================================================================
+# TAB 4: STRATEGY & METRIC GUIDE
+# =====================================================================
+with tab_guide:
+    st.subheader("📚 Strategy, Metric & Institutional Trap Glossary")
+    
+    st.markdown("""
+    ### 1. Weighted Momentum Formula
+    $$\\text{Weighted Momentum} = \\frac{3 \\times R_{3M} + 2 \\times R_{6M} + 1 \\times R_{9M}}{\\sigma_{3M}}$$
+    * **$R_{3M}, R_{6M}, R_{9M}$**: Price performance percentage over 3, 6, and 9 months.
+    * **$\\sigma_{3M}$**: Annualized standard deviation of daily returns over the last 63 trading days.
+    * **Why Weight Recent Returns?**: Time decay ensures that stocks with accelerating recent strength are ranked higher than stocks whose momentum peaked months ago.
+
+    ---
+
+    ### 2. Wyckoff Accumulation / Distribution (ADM) Protection
+    * **Stage 2 Markup**: When price is consistently above the 200 EMA and making higher swing highs with volume expansion.
+    * **Distribution Trap**: When a stock shows sharp price spikes without corresponding delivery volume, often driven by promoter hype or temporary commodity runs. Smart money sells into this retail liquidity.
+    * **52-Week High Proximity**: Leading stocks typically consolidate within 15% to 20% of their 52-week highs before breaking out.
+
+    ---
+
+    ### 3. Screener.in Fundamentals Quick Reference
+    * **Return on Equity (ROE)**: Measures how effectively management turns shareholder equity into net profit (Target: > 15%).
+    * **Debt to Equity (D/E)**: Leverage ratio. A value below 0.5 indicates a conservative balance sheet.
+    * **Promoter Pledging**: When promoters pledge shares to raise debt, it creates severe downside liquidation risk. Lower is safer.
+    """)
+    
